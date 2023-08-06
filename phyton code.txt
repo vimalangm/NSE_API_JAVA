@@ -1,0 +1,182 @@
+import datetime
+import requests
+import xlwings as xw
+import time
+import numpy as np
+import pandas as pd
+import threading
+
+today_open_time = datetime.datetime.now().replace(hour=8, minute=59)
+today_close_time = datetime.datetime.now().replace(hour=19, minute=35)
+
+
+book_location = "Stock option.xlsx"
+workbook = xw.Book(book_location)
+work_sheet = workbook.sheets['Sheet1']
+print(threading.active_count())
+
+
+
+def get_stocks():
+    header = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Connection": "keep-alive",
+        "DNT": "1",
+        "Host": "www.nseindia.com",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0"
+    }
+    for k in range(10):
+        try:
+            session = requests.Session()
+            master_link = 'https://www.nseindia.com/option-chain'
+            session.get(master_link, headers=header)
+            res = session.get('https://www.nseindia.com/api/master-quote', headers=header)
+            if res.status_code == 200:
+                payload_json = res.json()
+                return payload_json
+        except:
+            print("Retrying again.. ")
+            time.sleep(0.5)
+
+
+def get_nse_data(scan_list):
+    header = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Connection": "keep-alive",
+        "DNT": "1",
+        "Host": "www.nseindia.com",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0"
+    }
+
+    session = requests.Session()
+    master_link = 'https://www.nseindia.com/option-chain'
+    session.get(master_link, headers=header)
+    for item in scan_list:
+        print("scanning", item)
+        item_temp = item.replace("&","%26")
+        for k in range(10):
+            try:
+                session = requests.Session()
+                master_link = 'https://www.nseindia.com/option-chain'
+                session.get(master_link, headers=header)
+                if item == "NIFTY" or item == "BANKNIFTY":
+                    url = 'https://www.nseindia.com/api/option-chain-indices?symbol={}'.format(item_temp)
+                else:
+                    url = "https://www.nseindia.com/api/option-chain-equities?symbol={}".format(item_temp)
+                res = session.get(url, headers=header)
+                if res.status_code == 200:
+                    payload_json = res.json()
+            except Exception as e:
+                print(k,"Retrying again.. {}".format(item), e)
+                time.sleep(0.5)
+        timestamp = payload_json['records']["timestamp"].split(" ")[-1][:-3]
+        underlyingValue = payload_json['records']["underlyingValue"]
+        expiry_dates = payload_json['records']["expiryDates"]
+        next_expiry = expiry_dates[0]
+        data_pack = payload_json['records']["data"]
+        expiry_list = list()
+        expiry_pivot = 0
+        expiry_pivot_flag = False
+        CE_CHNG_IN_OI_total = 0
+        CE_VOLUME_total = 0
+        PE_CHNG_IN_OI_total = 0
+        PE_VOLUME_total = 0
+        for data in data_pack:
+            if data.get("expiryDate") == next_expiry:
+                if "CE" in data.keys():
+                    CE_OI = data['CE']['openInterest']
+                    CE_CHNG_IN_OI = data['CE']['changeinOpenInterest']
+                    CE_VOLUME = data['CE']['totalTradedVolume']
+
+                else:
+                    CE_OI = 0
+                    CE_CHNG_IN_OI = 0
+                    CE_VOLUME = 0
+
+                CE_CHNG_IN_OI_total += CE_CHNG_IN_OI
+                CE_VOLUME_total += CE_VOLUME
+                STRIKE_PRICE = data['strikePrice']
+                if "PE" in data.keys():
+                    PE_OI = data['PE']['openInterest']
+                    PE_CHNG_IN_OI = data['PE']['changeinOpenInterest']
+                    PE_VOLUME = data['PE']['totalTradedVolume']
+
+                else:
+                    PE_OI = 0
+                    PE_CHNG_IN_OI = 0
+                    PE_VOLUME = 0
+
+                PE_CHNG_IN_OI_total += PE_CHNG_IN_OI
+                PE_VOLUME_total += PE_VOLUME
+                if not expiry_pivot_flag and underlyingValue <= STRIKE_PRICE:
+                    expiry_pivot_flag = True
+                    expiry_pivot = len(expiry_list)
+                expiry_list.append([CE_OI, CE_CHNG_IN_OI, CE_VOLUME, STRIKE_PRICE, PE_VOLUME, PE_CHNG_IN_OI, PE_OI])
+
+        CE_IN_THE_MONEY = 0
+        PE_IN_THE_MONEY = 0
+        SP_CE_MAX_OI_OUT_THE_MONEY = -1
+        SP_PE_MAX_OI_OUT_THE_MONEY = -1
+        SP_CE_MAX_OI_OUT_THE_MONEY_pointer = -1
+        SP_PE_MAX_OI_OUT_THE_MONEY_pointer = -1
+        for tmp in expiry_list[:expiry_pivot]:
+            CE_IN_THE_MONEY += tmp[0]
+            if tmp[-1] >= SP_PE_MAX_OI_OUT_THE_MONEY:
+                SP_PE_MAX_OI_OUT_THE_MONEY = tmp[-1]
+                SP_PE_MAX_OI_OUT_THE_MONEY_pointer = tmp[3]
+
+        for tmp in expiry_list[expiry_pivot:]:
+            PE_IN_THE_MONEY += tmp[-1]
+            tmp_OI = tmp[0]
+            if tmp[0] >= SP_CE_MAX_OI_OUT_THE_MONEY:
+                SP_CE_MAX_OI_OUT_THE_MONEY = tmp[0]
+                SP_CE_MAX_OI_OUT_THE_MONEY_pointer = tmp[3]
+
+        lock.acquire()
+
+        pd_df.loc[item] = [item, underlyingValue, timestamp, CE_CHNG_IN_OI_total, PE_CHNG_IN_OI_total, CE_VOLUME_total, PE_VOLUME_total, CE_IN_THE_MONEY, PE_IN_THE_MONEY, SP_CE_MAX_OI_OUT_THE_MONEY_pointer, SP_PE_MAX_OI_OUT_THE_MONEY_pointer]
+        lock.release()
+
+
+
+df = np.zeros((300, 11))
+df = df.astype("str")
+df[df == '0.0'] = ""
+COL = ["stock", 'value', 'time', 'oi_b', 'oi_s', 'vol_b', 'vol_s', 'itm_b', 'itm,s', 'sp_b','sp_s']
+pd_df = pd.DataFrame(df, columns=COL)
+work_sheet.range('E7').options(pd.DataFrame, expand='table', index=False, header=False).value = pd_df
+
+stocks = get_stocks()
+scan_list = ["NIFTY", "BANKNIFTY"] + stocks
+pd_df = pd.DataFrame(index=scan_list, columns=COL)
+lock = threading.Lock()
+
+part_scan_list = [scan_list[:67], scan_list[67:132],scan_list[132:]]
+part_scan_list = [scan_list[:51], scan_list[51:101],scan_list[101:151], scan_list[151:]]
+while True:
+    if today_close_time >= datetime.datetime.now() >= today_open_time:
+        start_time = time.time()
+        thread_list = []
+        for k in range(4):
+            thd = threading.Thread(target=get_nse_data, args=(part_scan_list[k],))
+            thd.start()
+
+            thread_list.append(thd)
+        for k in thread_list:
+            k.join()
+        work_sheet.range('E7').options(pd.DataFrame, expand='table', index=False, header=False).value = pd_df
+        print(time.time() - start_time)
+    elif datetime.datetime.now() >= today_close_time:
+        print("Trading time over, \n closing the program. ")
+        break
+    else:
+        print("waiting for trading time to start.. will scan after 30s")
+        time.sleep(30)
+
+
+
+
