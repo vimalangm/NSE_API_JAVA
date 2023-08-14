@@ -1,5 +1,7 @@
 package com.nse.nse.controller;
 
+import java.io.FileNotFoundException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,10 +19,14 @@ public class NSEController {
 	NSEService nseService;
 
 	@GetMapping("/api")
-	public String getNseData() throws Exception {
+	public String getNseNiftyData() throws Exception {
 
-		return nseService.getNseData();
+		return nseService.getNseNiftyData();
 
+	}
+	@GetMapping("/generate")
+	public void generateCsv() throws FileNotFoundException {
+		nseService.generateNseDataExcel();
 	}
 
 }
