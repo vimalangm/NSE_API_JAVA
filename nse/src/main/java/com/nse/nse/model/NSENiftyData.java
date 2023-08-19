@@ -24,6 +24,7 @@ public class NSENiftyData {
 	private double nearestValue;
 	@Column(name = "valid_expiry_date")
 	private String validExpiryDate;
+	private String symbol;
 
 	public NSENiftyData() {
 		super();
@@ -31,7 +32,7 @@ public class NSENiftyData {
 	}
 
 	public NSENiftyData(long id, String createdDate, String createdTime, double underlyingValue, double ce, double pe,
-			double pcr, double nearestValue, String validExpiryDate) {
+			double pcr, double nearestValue, String validExpiryDate, String symbol) {
 		super();
 		this.id = id;
 		this.createdDate = createdDate;
@@ -42,6 +43,15 @@ public class NSENiftyData {
 		this.pcr = pcr;
 		this.nearestValue = nearestValue;
 		this.validExpiryDate = validExpiryDate;
+		this.symbol = symbol;
+	}
+
+	public String getSymbol() {
+		return symbol;
+	}
+
+	public void setSymbol(String symbol) {
+		this.symbol = symbol;
 	}
 
 	public long getId() {
@@ -129,7 +139,7 @@ public class NSENiftyData {
 		appendFieldValue(dataBuilder, String.valueOf(pcr));
 		appendFieldValue(dataBuilder, String.valueOf(nearestValue));
 		appendFieldValue(dataBuilder, String.valueOf(validExpiryDate));
-
+		appendFieldValue(dataBuilder, symbol);
 		return dataBuilder.toString();
 	}
 
