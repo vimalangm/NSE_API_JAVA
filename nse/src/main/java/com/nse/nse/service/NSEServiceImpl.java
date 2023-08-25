@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -35,11 +36,11 @@ public class NSEServiceImpl implements NSEService {
 	@Autowired
 	NSERepository nseRepository;
 
-	public static void main1(String[] args) {
-		double d = 19428.3;
-		// =ROUND(A1/50,0)*50
-		System.out.println(Math.round(d / 50.0) * 50);
-	}
+//	public static void main1(String[] args) {
+//		double d = 19428.3;
+//		// =ROUND(A1/50,0)*50
+//		System.out.println(Math.round(d / 50.0) * 50);
+//	}
 
 	@Autowired
 	WebClient.Builder builder;
@@ -53,52 +54,68 @@ public class NSEServiceImpl implements NSEService {
 		HttpHeaders headers = new HttpHeaders();
 		headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
 
-		WebClient client = WebClient.builder().baseUrl(baseUrl)
-				.exchangeStrategies(ExchangeStrategies.builder()
-						.codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build())
-				.build();
-
-		String response = client.get().uri("/api/option-chain-indices?symbol=NIFTY").retrieve().bodyToMono(String.class)
-				.block();
-		ObjectMapper om = new ObjectMapper();
-		Root root = om.readValue(response, Root.class);
-
-		String expiryDate = root.getRecords().getExpiryDates().get(0);
-		List<Datum> listOfDataByValidExpiryDate = root.getRecords().getData().stream()
-				.filter(x -> x.getExpiryDate().equals(expiryDate)).collect(Collectors.toList());
-
-		double underlyingValue = 0.0d;
-		for (Datum datum : listOfDataByValidExpiryDate) {
-
-			underlyingValue = datum.getcE().getUnderlyingValue();
-			if (underlyingValue > 0)
-				break;
-		}
-		double nearestFifty = Math.round(underlyingValue / 50.0) * 50;
-
-		getSumOfCEPE(expiryDate, listOfDataByValidExpiryDate, nearestFifty, ceSum, peSum);
-
-		for (double val = nearestFifty + 50; val <= nearestFifty + 500; val = val + 50) {
-			getSumOfCEPE(expiryDate, listOfDataByValidExpiryDate, val, ceSum, peSum);
-		}
-		for (double val = nearestFifty - 50; val >= nearestFifty - 500; val = val - 50) {
-			getSumOfCEPE(expiryDate, listOfDataByValidExpiryDate, val, ceSum, peSum);
-		}
-
-		Timestamp ts = new Timestamp(date.getTime());
-
+		String symbols[] = {  "NIFTY" };
 		NSENiftyData nse = new NSENiftyData();
 
-		nse.setUnderlyingValue(underlyingValue);
-		nse.setCreatedDate(sdf.format(date));
-		nse.setCreatedTime(ts.toString());
-		nse.setCe(ceSum);
-		nse.setPe(peSum);
-		nse.setPcr(ceSum / peSum);
-		nse.setNearestValue(nearestFifty);
-		nse.setValidExpiryDate(expiryDate);
-		nseRepository.save(nse);
-		return response;
+		for (String symbol : symbols) {
+			nse = new NSENiftyData();
+			WebClient client = WebClient.builder().baseUrl(baseUrl)
+					.exchangeStrategies(ExchangeStrategies.builder()
+							.codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build())
+					.build();
+
+			String response = client.get().uri("/api/option-chain-indices?symbol=" + symbol).retrieve()
+					.bodyToMono(String.class).block();
+			ObjectMapper om = new ObjectMapper();
+			Root root = om.readValue(response, Root.class);
+
+			String expiryDate = root.getRecords().getExpiryDates().get(0);
+			List<Datum> listOfDataByValidExpiryDate = root.getRecords().getData().stream()
+					.filter(x -> x.getExpiryDate().equals(expiryDate)).collect(Collectors.toList());
+
+			double underlyingValue = 0.0d;
+			for (Datum datum : listOfDataByValidExpiryDate) {
+
+				underlyingValue = datum.getcE().getUnderlyingValue();
+				if (underlyingValue > 0)
+					break;
+			}
+			double nearestFifty = 0.0d;
+			double increaseValue=0.0;
+			double tempValue=0.0;
+			if (symbol.equals("NIFTY")) {
+				increaseValue=50;
+				tempValue=500;
+				nearestFifty = Math.round(underlyingValue / 50.0) * 50;
+			}else {
+				increaseValue=100;
+				tempValue=1000;
+				nearestFifty = Math.round(underlyingValue / 100.0) * 100;
+			}
+			getSumOfCEPE(expiryDate, listOfDataByValidExpiryDate, nearestFifty, ceSum, peSum);
+
+			for (double val = nearestFifty +increaseValue; val <= nearestFifty + tempValue; val = val + increaseValue) {
+				getSumOfCEPE(expiryDate, listOfDataByValidExpiryDate, val, ceSum, peSum);
+			}
+			for (double val = nearestFifty - increaseValue; val >= nearestFifty - tempValue; val = val - increaseValue) {
+				getSumOfCEPE(expiryDate, listOfDataByValidExpiryDate, val, ceSum, peSum);
+			}
+
+			Timestamp ts = new Timestamp(date.getTime());
+
+			nse.setUnderlyingValue(underlyingValue);
+			nse.setCreatedDate(sdf.format(date));
+			nse.setCreatedTime(ts.toString());
+			nse.setCe(ceSum);
+			nse.setPe(peSum);
+			nse.setPcr(peSum / ceSum);
+			nse.setNearestValue(nearestFifty);
+			nse.setValidExpiryDate(expiryDate);
+			nse.setSymbol(symbol);
+			nseRepository.save(nse);
+		}
+
+		return "Exucution success!";
 	}
 
 	public void getSumOfCEPE(String expiryDate, List<Datum> listOfDataByValidExpiryDate, double nearestFifty,
@@ -115,15 +132,16 @@ public class NSEServiceImpl implements NSEService {
 		}
 	}
 
-	@Scheduled(cron = "0 32 19 * * ?")
-	public void generateNseDataExcel() throws FileNotFoundException {
+	@Scheduled(cron = "0 0 15 * * ?")
+	public String generateNseDataExcel() throws FileNotFoundException {
 		date = new Date();
+		Timestamp ts = new Timestamp(date.getTime());
 		List<NSENiftyData> listOfNseNifty = nseRepository.findByDate(sdf.format(date));
 		String fileName = "NSE_NIFTY_DATA_" + LocalDate.now() + ".csv";
-		PrintWriter writer = new PrintWriter(new File("D:\\Vimalan_Personal\\" + fileName));
+		PrintWriter writer = new PrintWriter(new File("D:\\Jaga\\web data\\Daily backup\\" + fileName));
 		StringBuffer csvHeader = new StringBuffer("");
 		csvHeader.append(
-				"Id, Creation Date, Creation Time, Underlying Value, CE Value, PE Value,PCE=CE/PE, Nearest Actual Value,Expiry Date\n");
+				"Id, Creation Date, Creation Time, Underlying Value, CE Value, PE Value,PCR=PE/CE, Nearest Actual Value,Expiry Date,Symbols\n");
 
 		writer.write(csvHeader.toString());
 		for (NSENiftyData nsedata : listOfNseNifty) {
@@ -132,7 +150,7 @@ public class NSEServiceImpl implements NSEService {
 		}
 
 		writer.close();
-
+		return "downloaded sucessfully";
 	}
 
 }

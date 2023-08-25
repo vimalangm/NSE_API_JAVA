@@ -7,5 +7,5 @@ public interface NSEService {
 
 	public String getNseNiftyData() throws Exception;
 
-	public void generateNseDataExcel() throws FileNotFoundException;
+	public String generateNseDataExcel() throws FileNotFoundException;
 }

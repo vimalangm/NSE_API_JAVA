@@ -25,8 +25,8 @@ public class NSEController {
 
 	}
 	@GetMapping("/generate")
-	public void generateCsv() throws FileNotFoundException {
-		nseService.generateNseDataExcel();
+	public String generateCsv() throws FileNotFoundException {
+		return nseService.generateNseDataExcel();
 	}
 
 }

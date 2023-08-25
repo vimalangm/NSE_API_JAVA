@@ -12,7 +12,6 @@ public class NseApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(NseApplication.class, args);
-		// getNseResponse();
 	}
 
 	@Bean
