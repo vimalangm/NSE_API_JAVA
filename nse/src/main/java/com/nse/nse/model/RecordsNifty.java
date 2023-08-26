@@ -2,17 +2,17 @@ package com.nse.nse.model;
 
 import java.util.ArrayList;
 
-public class Records {
+public class RecordsNifty {
 	public ArrayList<String> expiryDates;
     public ArrayList<Datum> data;
     public String timestamp;
     public double underlyingValue;
     public ArrayList<Integer> strikePrices;
-	public Records() {
+	public RecordsNifty() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
-	public Records(ArrayList<String> expiryDates, ArrayList<Datum> data, String timestamp, double underlyingValue,
+	public RecordsNifty(ArrayList<String> expiryDates, ArrayList<Datum> data, String timestamp, double underlyingValue,
 			ArrayList<Integer> strikePrices) {
 		super();
 		this.expiryDates = expiryDates;
