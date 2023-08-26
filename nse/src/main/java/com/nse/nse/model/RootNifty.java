@@ -1,24 +1,24 @@
 package com.nse.nse.model;
 
-public class Root{
-    public Records records;
+public class RootNifty{
+    public RecordsNifty records;
     public Filtered filtered;
     
-	public Root() {
+	public RootNifty() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
 	
-	public Root(Records records, Filtered filtered) {
+	public RootNifty(RecordsNifty records, Filtered filtered) {
 		super();
 		this.records = records;
 		this.filtered = filtered;
 	}
 
-	public Records getRecords() {
+	public RecordsNifty getRecords() {
 		return records;
 	}
-	public void setRecords(Records records) {
+	public void setRecords(RecordsNifty records) {
 		this.records = records;
 	}
 	public Filtered getFiltered() {
@@ -30,7 +30,7 @@ public class Root{
 
 	@Override
 	public String toString() {
-		return "Root [records=" + records + ", filtered=" + filtered + "]";
+		return "RootNifty [records=" + records + ", filtered=" + filtered + "]";
 	}
     
 }
