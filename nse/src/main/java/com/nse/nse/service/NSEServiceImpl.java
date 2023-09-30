@@ -74,7 +74,7 @@ public class NSEServiceImpl implements NSEService {
 					.exchangeStrategies(ExchangeStrategies.builder()
 							.codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build())
 					.build();
-
+			client.get().uri("/option-chain").retrieve();
 			String response = client.get().uri("/api/option-chain-indices?symbol=" + symbol).retrieve()
 					.bodyToMono(String.class).block();
 
@@ -180,8 +180,8 @@ public class NSEServiceImpl implements NSEService {
 	public List<Datum> getListOfBankNiftyData(String response) throws Exception {
 		ObjectMapper om = new ObjectMapper();
 		RootBankNifty root = om.readValue(response, RootBankNifty.class);
-		setExpiryDate(expiryDate);
 		String expiryDate = root.getRecords().getExpiryDates().get(0);
+		setExpiryDate(expiryDate);
 		return root.getRecords().getData().stream().filter(x -> x.getExpiryDate().equals(expiryDate))
 				.collect(Collectors.toList());
 	}
